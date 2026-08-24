@@ -1,0 +1,28 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="houseGrad" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0d9488" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Dark Navy / Sapphire Squircle Background -->
+  <rect width="32" height="32" rx="8" fill="url(#bgGrad)" />
+  
+  <!-- House Outline + Growth Arrow Silhouette -->
+  <path d="M14 6L6 13V24C6 24.55 6.45 25 7 25H21C21.55 25 22 24.55 22 24V19" stroke="url(#houseGrad)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Chimney -->
+  <path d="M9 10V7H11V8.5" stroke="url(#houseGrad)" stroke-width="1.8" stroke-linecap="round"/>
+  
+  <!-- Dynamic Upward Growth Arrow -->
+  <path d="M10 20L15 15L19 19L26 8" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22 8H26V12" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- AI Sparkle Golden Pin -->
+  <circle cx="23" cy="7" r="2" fill="#fbbf24" />
+</svg>

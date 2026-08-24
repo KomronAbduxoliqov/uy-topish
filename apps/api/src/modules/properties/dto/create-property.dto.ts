@@ -14,8 +14,7 @@ import {
   TransactionType,
   PropertyType,
   RenovationType,
-  BuildingType,
-  ListingStatus
+  BuildingType
 } from '@uytop/shared-types';
 
 export class PropertyImageDto {
@@ -157,15 +156,5 @@ export class CreatePropertyDto {
   @IsArray()
   images?: PropertyImageDto[];
 
-  @IsOptional()
-  @IsEnum(ListingStatus)
-  status?: ListingStatus;
 
-  @IsOptional()
-  @IsString()
-  ownerPhone?: string;
-
-  @IsOptional()
-  @IsString()
-  ownerName?: string;
 }

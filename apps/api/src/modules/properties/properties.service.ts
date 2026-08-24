@@ -6,7 +6,7 @@ import {
   OnModuleInit
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DeepPartial } from 'typeorm';
 import { PropertyEntity } from '../../database/entities/property.entity';
 import { PropertyImageEntity } from '../../database/entities/property-image.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -38,15 +38,15 @@ export class PropertiesService implements OnModuleInit {
         this.logger.log('Database properties table is empty. Seeding initial Tashkent properties...');
         for (const data of SEED_PROPERTIES_DATA) {
           const { images, ...propertyData } = data;
-          const property = this.propertyRepository.create(propertyData as any);
-          const savedProperty = await this.propertyRepository.save(property);
+          const propertyEntity = this.propertyRepository.create(propertyData as DeepPartial<PropertyEntity>);
+          const savedProperty = await this.propertyRepository.save(propertyEntity);
 
           if (images && images.length > 0) {
             for (const img of images) {
               const imageEntity = this.imageRepository.create({
                 ...img,
                 propertyId: savedProperty.id
-              });
+              } as DeepPartial<PropertyImageEntity>);
               await this.imageRepository.save(imageEntity);
             }
           }
@@ -71,12 +71,13 @@ export class PropertiesService implements OnModuleInit {
       priceUsd,
       nearestMetroStation: nearestMetroInfo.station.nameUz,
       nearestMetroDistanceMeters: nearestMetroInfo.distanceMeters,
-      status: dto.status || ListingStatus.PENDING_MODERATION,
-      verificationTier: VerificationTier.PHONE_VERIFIED,
-      ownerPhone: dto.ownerPhone || userPhone || '+998901234567',
-      ownerName: dto.ownerName || userName || 'Mulk egasi',
+      // Publication and contact identity are server-controlled and must not be supplied by the client.
+      status: ListingStatus.PENDING_MODERATION,
+      verificationTier: VerificationTier.UNVERIFIED,
+      ownerPhone: userPhone || '',
+      ownerName: userName || '',
       publishedAt: new Date()
-    });
+    } as DeepPartial<PropertyEntity>);
 
     const saved = await this.propertyRepository.save(property);
 
@@ -88,7 +89,7 @@ export class PropertiesService implements OnModuleInit {
           propertyId: saved.id,
           displayOrder: img.displayOrder !== undefined ? img.displayOrder : i,
           isCover: img.isCover !== undefined ? img.isCover : i === 0
-        });
+        } as DeepPartial<PropertyImageEntity>);
         await this.imageRepository.save(imageEntity);
       }
     }
@@ -148,14 +149,20 @@ export class PropertiesService implements OnModuleInit {
   }
 
   async checkDuplicatePotential(lat: number, lng: number, priceUzs: number, rooms: number): Promise<{ isDuplicate: boolean; duplicateCandidate?: PropertyEntity }> {
-    const properties = await this.propertyRepository.find();
-    for (const p of properties) {
-      const distance = this.geoService.calculateDistanceMeters(lat, lng, Number(p.latitude), Number(p.longitude));
-      const priceDiffPercent = Math.abs(p.priceUzs - priceUzs) / p.priceUzs;
-      if (distance < 50 && p.rooms === rooms && priceDiffPercent < 0.15) {
-        return { isDuplicate: true, duplicateCandidate: p };
-      }
+    // High-performance B-tree coordinate bounding box query (~50 meters tolerance)
+    const nearby = await this.propertyRepository
+      .createQueryBuilder('property')
+      .where('property.rooms = :rooms', { rooms })
+      .andWhere('ABS(property.latitude - :lat) < 0.0005', { lat })
+      .andWhere('ABS(property.longitude - :lng) < 0.0006', { lng })
+      .andWhere('ABS(property.priceUzs - :priceUzs) / GREATEST(property.priceUzs, 1) < 0.15', { priceUzs })
+      .limit(1)
+      .getMany();
+
+    if (nearby.length > 0) {
+      return { isDuplicate: true, duplicateCandidate: nearby[0] };
     }
+
     return { isDuplicate: false };
   }
 }

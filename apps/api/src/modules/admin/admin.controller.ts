@@ -4,9 +4,11 @@ import {
   Put,
   Param,
   Body,
-  UseGuards
+  UseGuards,
+  ParseUUIDPipe
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { IsNotEmpty, IsEnum } from 'class-validator';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -14,6 +16,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@uytop/shared-types';
 
 export class UpdateRoleDto {
+  @IsNotEmpty({ message: 'Foydalanuvchi roli kiritilishi shart' })
+  @IsEnum(UserRole, { message: 'Noto‘g‘ri foydalanuvchi roli' })
   role: UserRole;
 }
 
@@ -40,7 +44,7 @@ export class AdminController {
   @Put('users/:id/role')
   @ApiOperation({ summary: 'Foydalanuvchi rolini o\'zgartirish' })
   async updateRole(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateRoleDto
   ) {
     return this.adminService.updateUserRole(id, dto.role);

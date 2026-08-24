@@ -3,14 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "prebuild": "npm run build --workspace=@uytop/shared-types",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",
+    "prestart": "npm run build --workspace=@uytop/shared-types",
     "start": "nest start",
+    "prestart:dev": "npm run build --workspace=@uytop/shared-types",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:integration": "jest test/geo.integration.spec.ts test/api.integration.spec.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

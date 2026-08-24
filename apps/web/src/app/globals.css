@@ -1,0 +1,478 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply antialiased text-slate-800 bg-slate-50;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Smooth button touch behavior without mobile delay */
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+}
+
+/* Butter-smooth transition presets & GPU Acceleration */
+.transition-smooth {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.transition-transform-smooth {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* 60-120 FPS Smooth Card Rendering Optimization */
+.smooth-card-render {
+  content-visibility: auto;
+  contain-intrinsic-size: 340px;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+
+/* Custom Scrollbar - Modern Slim Minimalist */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Leaflet Map Overrides */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #f1f5f9;
+  font-family: inherit;
+  z-index: 0;
+}
+
+.cursor-crosshair .leaflet-container,
+.cursor-crosshair .leaflet-grab,
+.cursor-crosshair .leaflet-interactive {
+  cursor: crosshair !important;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 18px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+  border: 1px solid #e2e8f0;
+  padding: 0;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+.leaflet-popup-content {
+  margin: 10px;
+  line-height: 1.4;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.15);
+}
+
+/* Custom Map Icons — remove default Leaflet icon backgrounds */
+.custom-map-icon,
+.custom-metro-icon,
+.custom-center-pin,
+.custom-picker-pin {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Map Price Badge Styling */
+.map-price-badge {
+  background: #ffffff;
+  color: #0f172a;
+  padding: 5px 10px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+  border: 1.5px solid #10b981;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  will-change: transform;
+}
+
+.map-price-badge:hover,
+.map-price-badge.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+  transform: scale(1.12);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.3);
+  z-index: 999 !important;
+}
+
+/* Modern Skeleton Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.6) 0%,
+    rgba(241, 245, 249, 0.9) 50%,
+    rgba(226, 232, 240, 0.6) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite ease-in-out;
+}
+
+html.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(31, 41, 55, 0.6) 0%,
+    rgba(55, 65, 81, 0.8) 50%,
+    rgba(31, 41, 55, 0.6) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite ease-in-out;
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-popIn {
+  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Toast slide-in animation */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slideOutRight {
+  animation: slideOutRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Slide from left for drawers */
+@keyframes slideRight {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slideRight {
+  animation: slideRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Accessibility: Respect Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Dark Mode Universal Styling Suite */
+html.dark {
+  color-scheme: dark;
+  background-color: #090d16;
+}
+
+html.dark body {
+  background-color: #090d16 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Backgrounds in dark mode */
+html.dark .bg-white {
+  background-color: #111827 !important;
+}
+
+html.dark .bg-white\/95 {
+  background-color: rgba(17, 24, 39, 0.95) !important;
+}
+
+html.dark .bg-white\/90 {
+  background-color: rgba(17, 24, 39, 0.9) !important;
+}
+
+html.dark .bg-slate-50 {
+  background-color: #090d16 !important;
+}
+
+html.dark .bg-slate-50\/50,
+html.dark .bg-slate-50\/60 {
+  background-color: rgba(17, 24, 39, 0.6) !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #1f2937 !important;
+}
+
+html.dark .bg-slate-100\/80 {
+  background-color: rgba(31, 41, 55, 0.8) !important;
+}
+
+html.dark .hover\:bg-slate-50:hover {
+  background-color: #1f2937 !important;
+}
+
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #374151 !important;
+}
+
+html.dark .hover\:bg-slate-200:hover,
+html.dark .hover\:bg-slate-200\/60:hover,
+html.dark .hover\:bg-slate-200\/70:hover {
+  background-color: #374151 !important;
+}
+
+/* Text colors in dark mode */
+html.dark .text-slate-900 {
+  color: #f9fafb !important;
+}
+
+html.dark .text-slate-800 {
+  color: #f3f4f6 !important;
+}
+
+html.dark .text-slate-700 {
+  color: #e5e7eb !important;
+}
+
+html.dark .text-slate-600 {
+  color: #d1d5db !important;
+}
+
+html.dark .text-slate-500 {
+  color: #9ca3af !important;
+}
+
+html.dark .text-slate-400 {
+  color: #9ca3af !important;
+}
+
+/* Borders in dark mode */
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-200\/50,
+html.dark .border-slate-200\/60,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-200\/90 {
+  border-color: #1f2937 !important;
+}
+
+html.dark .divide-slate-100 > * + *,
+html.dark .divide-slate-200 > * + * {
+  border-color: #1f2937 !important;
+}
+
+/* Inputs, Selects & Form Controls in dark mode */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+  border-color: #374151 !important;
+}
+
+html.dark select option {
+  background-color: #111827;
+  color: #f9fafb;
+}
+
+/* Map Overrides in dark mode */
+html.dark .leaflet-container {
+  background: #0f172a;
+}
+
+html.dark .map-price-badge {
+  background: #111827 !important;
+  color: #f9fafb !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .map-price-badge:hover,
+html.dark .map-price-badge.active {
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border-color: #10b981 !important;
+}
+
+html.dark .leaflet-popup-content-wrapper {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+  border-color: #1f2937 !important;
+}
+
+html.dark .leaflet-popup-tip {
+  background-color: #111827 !important;
+}
+
+/* Brand & Accent Badges in dark mode */
+html.dark .bg-brand-50,
+html.dark .bg-brand-50\/60,
+html.dark .bg-brand-50\/70 {
+  background-color: rgba(6, 78, 59, 0.35) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+html.dark .text-brand-900,
+html.dark .text-brand-800,
+html.dark .text-brand-700 {
+  color: #34d399 !important;
+}
+
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-50\/60 {
+  background-color: rgba(6, 78, 59, 0.35) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+html.dark .bg-sky-50 {
+  background-color: rgba(12, 74, 110, 0.35) !important;
+  color: #7dd3fc !important;
+  border-color: rgba(14, 165, 233, 0.3) !important;
+}
+
+html.dark .bg-rose-50 {
+  background-color: rgba(136, 19, 55, 0.35) !important;
+  color: #fda4af !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+html.dark .bg-indigo-50 {
+  background-color: rgba(49, 46, 129, 0.35) !important;
+  color: #a5b4fc !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+html.dark .bg-amber-50,
+html.dark .bg-amber-50\/70 {
+  background-color: rgba(120, 53, 15, 0.35) !important;
+  color: #fcd34d !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Modals and Drawers */
+html.dark .shadow-2xl,
+html.dark .shadow-xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Scrollbar in dark mode */
+html.dark ::-webkit-scrollbar-thumb {
+  background: #374151;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* Print optimization for Rental Contracts & Handover Acts */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, footer, nav, button, .print\:hidden {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+}
+

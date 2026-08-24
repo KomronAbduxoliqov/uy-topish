@@ -2,18 +2,21 @@ import {
   Controller,
   Get,
   Post,
-  Delete,
   Param,
   Body,
-  UseGuards
+  UseGuards,
+  ParseUUIDPipe
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { IsArray, IsUUID } from 'class-validator';
 import { FavoritesService } from './favorites.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserEntity } from '../../database/entities/user.entity';
 
 export class CompareDto {
+  @IsArray({ message: 'Taqqoslash uchun e\'lonlar ID ro‘yxati massiv bo‘lishi kerak' })
+  @IsUUID('4', { each: true, message: 'Har bir taqqoslash ID si to‘g‘ri UUID bo‘lishi kerak' })
   propertyIds: string[];
 }
 
@@ -27,7 +30,7 @@ export class FavoritesController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'E\'lonni saqlanganlarga qo\'shish yoki olib tashlash (Toggle)' })
   async toggleFavorite(
-    @Param('propertyId') propertyId: string,
+    @Param('propertyId', new ParseUUIDPipe({ version: '4' })) propertyId: string,
     @CurrentUser() user: UserEntity
   ) {
     return this.favoritesService.toggleFavorite(user.id, propertyId);

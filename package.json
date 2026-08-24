@@ -12,7 +12,16 @@
     "dev:api": "npm run start:dev --workspace=@uytop/api",
     "dev:web": "npm run dev --workspace=@uytop/web",
     "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
+    "test": "npm run test:web && npm run test:api",
+    "test:web": "npm run test --workspace=@uytop/web",
+    "test:web:watch": "npm run test:watch --workspace=@uytop/web",
+    "test:web:coverage": "npm run test:coverage --workspace=@uytop/web",
+    "test:api": "npm run test --workspace=@uytop/api",
+    "test:api:watch": "npm run test:watch --workspace=@uytop/api",
+    "test:integration": "npm run test --workspace=@uytop/api -- test/geo.integration.spec.ts test/api.integration.spec.ts",
+    "test:e2e": "playwright test",
+    "test:coverage": "npm run test:web:coverage && npm run test:coverage --workspace=@uytop/api",
+    "test:all": "npm run test:web && npm run test:api && npm run test:e2e",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "docker:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
@@ -20,6 +29,7 @@
     "docker:logs": "docker compose -f infrastructure/docker/docker-compose.yml logs -f"
   },
   "devDependencies": {
+    "@playwright/test": "^1.44.0",
     "concurrently": "^8.2.2",
     "typescript": "^5.4.5"
   },

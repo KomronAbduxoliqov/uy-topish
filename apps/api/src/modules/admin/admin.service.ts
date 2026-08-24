@@ -38,7 +38,7 @@ export class AdminService {
       .select('p.district', 'district')
       .addSelect('COUNT(p.id)', 'count')
       .groupBy('p.district')
-      .getRawOne();
+      .getRawMany();
 
     return {
       metrics: {

@@ -1,17 +1,16 @@
 version: '3.8'
 
 services:
-  # PostgreSQL 16 with PostGIS 3.4 Spatial Engine
+  # PostgreSQL 16 Database
   db:
-    image: postgis/postgis:16-3.4-alpine
+    image: postgres:16-alpine
     container_name: uytop-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD_IS_REQUIRED}
       POSTGRES_DB: ${DB_NAME:-uytop_db}
-    ports:
-      - "${DB_PORT:-5432}:5432"
+
     volumes:
       - uytop_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,13 +19,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis 7 In-Memory Cache & Rate Limiting
+  # Redis 7 In-Memory Cache & Rate Limiter
   redis:
     image: redis:7.2-alpine
     container_name: uytop-redis
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+
     volumes:
       - uytop_redisdata:/data
     healthcheck:
@@ -53,15 +51,13 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD_IS_REQUIRED}
       DB_NAME: ${DB_NAME:-uytop_db}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET:-uytop_production_jwt_secret_key_2026}
-    ports:
-      - "4000:4000"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET_IS_REQUIRED}
 
-  # React 18 + Vite + Nginx Frontend
+  # Next.js App Router Web Frontend
   web:
     build:
       context: ../..
@@ -70,8 +66,27 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_INTERNAL_URL: http://api:4000/api/v1
+      NEXT_PUBLIC_SITE_URL: http://localhost
+      NEXT_PUBLIC_YANDEX_MAP_KEY: f3306db0-3796-48a0-8a47-f7037f6a73c1
+    ports:
+      - "3000:3000"
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: uytop-nginx
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
     ports:
       - "80:80"
+    volumes:
+      - ../nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
 
 volumes:
   uytop_pgdata:

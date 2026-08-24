@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for React Web
+# Multi-stage Dockerfile for Next.js Web Frontend
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -15,12 +15,23 @@ COPY apps/web/ ./apps/web/
 RUN npm run build --workspace=@uytop/shared-types
 RUN npm run build --workspace=@uytop/web
 
-# Nginx static server stage
-FROM nginx:1.25-alpine AS runner
+# Production Runner stage
+FROM node:20-alpine AS runner
 
-COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
-COPY infrastructure/nginx/default.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
 
-EXPOSE 80
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/packages/shared-types/package*.json ./packages/shared-types/
+COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
+COPY --from=builder /app/apps/web/package*.json ./apps/web/
+COPY --from=builder /app/apps/web/.next ./apps/web/.next
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder /app/apps/web/next.config.mjs ./apps/web/next.config.mjs
 
-CMD ["nginx", "-g", "daemon off;"]
+RUN npm ci --omit=dev
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start", "--workspace=@uytop/web"]

@@ -1,5 +1,4 @@
-import { IsNotEmpty, IsString, Matches, MinLength, IsOptional, IsEnum, IsEmail } from 'class-validator';
-import { UserRole } from '@uytop/shared-types';
+import { IsNotEmpty, IsString, Matches, MinLength, MaxLength, IsOptional, IsEmail } from 'class-validator';
 
 export class RegisterDto {
   @IsNotEmpty({ message: "Telefon raqami kiritilishi shart" })
@@ -10,22 +9,25 @@ export class RegisterDto {
 
   @IsNotEmpty({ message: "To'liq ism kiritilishi shart" })
   @IsString()
+  @MaxLength(100)
   fullName: string;
 
   @IsNotEmpty({ message: "Parol kiritilishi shart" })
-  @MinLength(6, { message: "Parol kamida 6 ta belgidan iborat bo'lishi kerak" })
+  @MinLength(12, { message: "Parol kamida 12 ta belgidan iborat bo'lishi kerak" })
+  @MaxLength(128)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
+    message: "Parolda katta-kichik harf va kamida bitta raqam bo'lishi kerak",
+  })
   password: string;
 
   @IsOptional()
   @IsEmail({}, { message: "Email manzili noto'g'ri" })
   email?: string;
 
-  @IsOptional()
-  @IsEnum(UserRole, { message: "Foydalanuvchi roli noto'g'ri" })
-  role?: UserRole;
 
   @IsOptional()
   @IsString()
+  @MaxLength(150)
   agencyName?: string;
 }
 
@@ -37,5 +39,6 @@ export class LoginDto {
   phone: string;
 
   @IsNotEmpty({ message: "Parol kiritilishi shart" })
+  @MaxLength(128)
   password: string;
 }

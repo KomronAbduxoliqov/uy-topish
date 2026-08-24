@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository } from 'typeorm';
 import { PropertyEntity } from '../../database/entities/property.entity';
 import { PropertySearchFilters, ListingStatus, Property } from '@uytop/shared-types';
 import { GeoService } from '../geo/geo.service';
+import { RoutingService } from '../geo/routing.service';
+import { SmartNearbyService } from '../geo/smart-nearby.service';
 
 @Injectable()
 export class SearchService {
@@ -11,6 +13,8 @@ export class SearchService {
     @InjectRepository(PropertyEntity)
     private propertyRepository: Repository<PropertyEntity>,
     private geoService: GeoService,
+    private routingService: RoutingService,
+    private smartNearbyService: SmartNearbyService,
   ) {}
 
   async searchProperties(filters: PropertySearchFilters): Promise<{ items: Property[]; total: number; page: number; limit: number }> {
@@ -41,53 +45,113 @@ export class SearchService {
       query.andWhere('LOWER(p.district) LIKE LOWER(:district)', { district: `%${filters.district}%` });
     }
 
-    // Price Range
-    if (filters.minPrice) {
-      query.andWhere('p.priceUzs >= :minPrice', { minPrice: Number(filters.minPrice) });
-    }
-    if (filters.maxPrice) {
-      query.andWhere('p.priceUzs <= :maxPrice', { maxPrice: Number(filters.maxPrice) });
+    // Rooms
+    if (filters.rooms && filters.rooms.length > 0) {
+      query.andWhere('p.rooms IN (:...rooms)', { rooms: filters.rooms });
     }
 
-    // Rooms (Array of rooms or single)
-    if (filters.rooms && filters.rooms.length > 0) {
-      const roomNumbers = Array.isArray(filters.rooms) ? filters.rooms.map(Number) : [Number(filters.rooms)];
-      query.andWhere('p.rooms IN (:...rooms)', { rooms: roomNumbers });
+    // Price Bounds
+    if (filters.minPrice) {
+      query.andWhere('p.priceUzs >= :minPrice', { minPrice: filters.minPrice });
+    }
+    if (filters.maxPrice) {
+      query.andWhere('p.priceUzs <= :maxPrice', { maxPrice: filters.maxPrice });
     }
 
     // Furnished
-    if (filters.furnished !== undefined && filters.furnished !== null) {
-      const isFurnished = String(filters.furnished) === 'true' || filters.furnished === true;
-      if (isFurnished) {
-        query.andWhere('p.furnished = :furnished', { furnished: true });
-      }
+    if (filters.furnished !== undefined) {
+      query.andWhere('p.furnished = :furnished', { furnished: filters.furnished });
     }
 
-    // Near Metro
-    if (filters.nearMetro) {
-      query.andWhere('p.nearestMetroDistanceMeters <= :maxMetroDist', { maxMetroDist: 800 });
+    // Min/Max Area
+    if (filters.minArea) {
+      query.andWhere('p.areaSqm >= :minArea', { minArea: filters.minArea });
+    }
+    if (filters.maxArea) {
+      query.andWhere('p.areaSqm <= :maxArea', { maxArea: filters.maxArea });
     }
 
-    // Text Query (Full-text / Fuzzy matching across titles, addresses, and districts)
-    if (filters.query && filters.query.trim().length > 0) {
-      const q = `%${filters.query.trim().toLowerCase()}%`;
-      query.andWhere(
-        '(LOWER(p.titleUz) LIKE :q OR LOWER(p.titleRu) LIKE :q OR LOWER(p.addressLine) LIKE :q OR LOWER(p.district) LIKE :q OR LOWER(p.descriptionUz) LIKE :q)',
-        { q }
-      );
+    // Renovation
+    if (filters.renovation && filters.renovation.length > 0) {
+      query.andWhere('p.renovation IN (:...renovations)', { renovations: filters.renovation });
     }
 
-    // PostGIS Spatial Bounding / Radius filter if centerLat, centerLng, and radius are given
+    // Verification
+    if (filters.verificationTier && filters.verificationTier.length > 0) {
+      query.andWhere('p.verificationTier IN (:...tiers)', { tiers: filters.verificationTier });
+    }
+
     let properties = await query.getMany();
 
-    if (filters.centerLat && filters.centerLng) {
-      const cLat = Number(filters.centerLat);
-      const cLng = Number(filters.centerLng);
+    // ==========================================
+    // 1. WALKING TIME & ACCESSIBILITY SEARCH MODE
+    // ==========================================
+    const isWalkingSearch =
+      filters.searchMode === 'WALKING_TIME' ||
+      (filters.travelMinutes && filters.travelMinutes > 0);
+
+    const originLat = Number(filters.originLat ?? filters.centerLat);
+    const originLng = Number(filters.originLng ?? filters.centerLng);
+
+    if (isWalkingSearch && !isNaN(originLat) && !isNaN(originLng)) {
+      const maxMinutes = Number(filters.travelMinutes) || 15;
+      // Coarse Pre-Filter (straight line bounds: maxMinutes * 80m/min * 1.35 factor)
+      const coarseBoundingMeters = Math.round(maxMinutes * 80 * 1.35);
+
+      const coarseCandidates = properties.filter((prop) => {
+        const straightM = this.routingService.calculateStraightLineMeters(
+          originLat,
+          originLng,
+          Number(prop.latitude),
+          Number(prop.longitude)
+        );
+        (prop as any).straightLineDistanceMeters = straightM;
+        return straightM <= coarseBoundingMeters;
+      });
+
+      // Sort by straight-line distance to take top candidate set
+      coarseCandidates.sort(
+        (a, b) => (a as any).straightLineDistanceMeters - (b as any).straightLineDistanceMeters
+      );
+
+      // Batch route calculation for top candidates (max 30 candidates to prevent overhead)
+      const routeMap = await this.routingService.batchCalculateWalkingRoutes(
+        { lat: originLat, lng: originLng, name: filters.originName },
+        coarseCandidates,
+        30
+      );
+
+      // Filter by actual walking duration
+      const reachableProperties: PropertyEntity[] = [];
+      for (const candidate of coarseCandidates) {
+        const route = routeMap.get(candidate.id);
+        if (route && route.durationMinutes <= maxMinutes) {
+          (candidate as any).travelMetadata = route;
+          (candidate as any).walkingMinutes = route.durationMinutes;
+          reachableProperties.push(candidate);
+        }
+      }
+
+      properties = reachableProperties;
+
+      // Default sort by walking time unless specified otherwise
+      if (!filters.sortBy || filters.sortBy === 'walking_time' || filters.sortBy === 'distance') {
+        properties.sort((a, b) => (a as any).walkingMinutes - (b as any).walkingMinutes);
+      }
+    }
+    // ==========================================
+    // 2. STANDARD RADIUS SEARCH MODE
+    // ==========================================
+    else if (!isNaN(originLat) && !isNaN(originLng)) {
       const radius = Number(filters.radiusMeters) || 5000;
 
-      // Filter by Great-Circle distance (PostGIS ST_DWithin logic)
       properties = properties.filter((prop) => {
-        const dist = this.geoService.calculateDistanceMeters(cLat, cLng, Number(prop.latitude), Number(prop.longitude));
+        const dist = this.geoService.calculateDistanceMeters(
+          originLat,
+          originLng,
+          Number(prop.latitude),
+          Number(prop.longitude)
+        );
         (prop as any).distanceFromCenterMeters = dist;
         return dist <= radius;
       });
@@ -97,7 +161,7 @@ export class SearchService {
       }
     }
 
-    // Sorting
+    // Price & Newest Sorting
     if (filters.sortBy === 'price_asc') {
       properties.sort((a, b) => Number(a.priceUzs) - Number(b.priceUzs));
     } else if (filters.sortBy === 'price_desc') {
@@ -109,7 +173,7 @@ export class SearchService {
     const total = properties.length;
     const paginatedItems = properties.slice(skip, skip + limit);
 
-    // Compute dynamic match reasons for UX
+    // Compute dynamic match reasons & attach Smart Nearby for UX
     const enriched = paginatedItems.map((p) => {
       const reasons: string[] = [];
       if (p.nearestMetroDistanceMeters && p.nearestMetroDistanceMeters <= 500) {
@@ -129,6 +193,7 @@ export class SearchService {
       return {
         ...p,
         matchReasons: reasons,
+        travelMetadata: (p as any).travelMetadata,
         priceUzs: Number(p.priceUzs),
         priceUsd: Number(p.priceUsd),
         latitude: Number(p.latitude),

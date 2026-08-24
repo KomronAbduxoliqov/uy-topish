@@ -1,3 +1,5 @@
+'use client';
+
 import { create } from 'zustand';
 import {
   Property,
@@ -8,6 +10,7 @@ import {
   ParsedAIIntent
 } from '@uytop/shared-types';
 import { Language } from '../i18n';
+import { apiClient } from '../lib/api/client';
 
 interface AppState {
   language: Language;
@@ -21,6 +24,25 @@ interface AppState {
   filters: PropertySearchFilters;
   setFilters: (filters: Partial<PropertySearchFilters>) => void;
   resetFilters: () => void;
+
+  advancedFilters: {
+    minArea?: number;
+    maxArea?: number;
+    minFloor?: number;
+    maxFloor?: number;
+    notFirstFloor?: boolean;
+    notLastFloor?: boolean;
+    buildingType?: string[];
+    renovation?: string[];
+    hasLift?: boolean;
+    hasParking?: boolean;
+    hasBalcony?: boolean;
+    hasAC?: boolean;
+  };
+  setAdvancedFilters: (filters: Partial<AppState['advancedFilters']>) => void;
+  resetAdvancedFilters: () => void;
+  isAdvancedFiltersOpen: boolean;
+  setIsAdvancedFiltersOpen: (open: boolean) => void;
 
   properties: Property[];
   setProperties: (properties: Property[]) => void;
@@ -60,8 +82,61 @@ interface AppState {
   isModerationModalOpen: boolean;
   setIsModerationModalOpen: (open: boolean) => void;
 
+  currency: 'UZS' | 'USD';
+  setCurrency: (currency: 'UZS' | 'USD') => void;
+
+  isFavoritesModalOpen: boolean;
+  setIsFavoritesModalOpen: (open: boolean) => void;
+
+  isMortgageModalOpen: boolean;
+  setIsMortgageModalOpen: (open: boolean) => void;
+  mortgageInitialPrice: number;
+  setMortgageInitialPrice: (price: number) => void;
+
+  isValuationModalOpen: boolean;
+  setIsValuationModalOpen: (open: boolean) => void;
+
+  isAlertModalOpen: boolean;
+  setIsAlertModalOpen: (open: boolean) => void;
+
   isMobileMapView: boolean;
   setIsMobileMapView: (isMap: boolean) => void;
+
+  // Recently Viewed Properties
+  recentlyViewed: string[];
+  addRecentlyViewed: (propertyId: string) => void;
+  clearRecentlyViewed: () => void;
+  isRecentDrawerOpen: boolean;
+  setIsRecentDrawerOpen: (open: boolean) => void;
+
+  // AI Personal Home Finder State
+  isAiHomeFinderOpen: boolean;
+  setIsAiHomeFinderOpen: (open: boolean) => void;
+  aiFinderMessages: any[];
+  setAiFinderMessages: (messages: any[]) => void;
+  addAiFinderMessage: (message: any) => void;
+  aiFinderPreferences: any;
+  setAiFinderPreferences: (prefs: any) => void;
+  resetAiFinder: () => void;
+  aiFinderRecommendations: any[];
+  setAiFinderRecommendations: (recs: any[]) => void;
+  isSavedProfilesOpen: boolean;
+  setIsSavedProfilesOpen: (open: boolean) => void;
+
+  // Reporting & Fraud Protection
+  reportingPropertyId: string | null;
+  setReportingPropertyId: (id: string | null) => void;
+
+  // Legal Rental Contract Generator State
+  isContractModalOpen: boolean;
+  setIsContractModalOpen: (open: boolean) => void;
+  contractProperty: Property | null;
+  setContractProperty: (property: Property | null) => void;
+
+  // Toast Notifications
+  toasts: { id: string; message: string; type: 'success' | 'error' | 'info' | 'warning' }[];
+  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  dismissToast: (id: string) => void;
 }
 
 const DEFAULT_FILTERS: PropertySearchFilters = {
@@ -82,28 +157,23 @@ const DEFAULT_FILTERS: PropertySearchFilters = {
 };
 
 export const useAppStore = create<AppState>((set) => ({
-  language: (localStorage.getItem('uytop_lang') as Language) || 'uz',
+  language: 'uz',
   setLanguage: (language) => {
-    localStorage.setItem('uytop_lang', language);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('uytop_lang', language);
+    }
     set({ language });
   },
 
-  user: JSON.parse(localStorage.getItem('uytop_user') || 'null'),
-  token: localStorage.getItem('uytop_token') || null,
+  user: null,
+  token: null,
+  // Access tokens intentionally stay in memory; persistent browser storage makes them available to XSS.
   setUser: (user, token) => {
-    if (user && token) {
-      localStorage.setItem('uytop_user', JSON.stringify(user));
-      localStorage.setItem('uytop_token', token);
-      set({ user, token });
-    } else {
-      localStorage.removeItem('uytop_user');
-      localStorage.removeItem('uytop_token');
-      set({ user: null, token: null });
-    }
+    apiClient.setAccessToken(user && token ? token : null);
+    set(user && token ? { user, token } : { user: null, token: null });
   },
   logout: () => {
-    localStorage.removeItem('uytop_user');
-    localStorage.removeItem('uytop_token');
+    apiClient.setAccessToken(null);
     set({ user: null, token: null });
   },
 
@@ -118,6 +188,15 @@ export const useAppStore = create<AppState>((set) => ({
       selectedMapCenter: null,
       lastParsedAiIntent: null
     }),
+
+  advancedFilters: {},
+  setAdvancedFilters: (newFilters) =>
+    set((state) => ({
+      advancedFilters: { ...state.advancedFilters, ...newFilters }
+    })),
+  resetAdvancedFilters: () => set({ advancedFilters: {} }),
+  isAdvancedFiltersOpen: false,
+  setIsAdvancedFiltersOpen: (isAdvancedFiltersOpen) => set({ isAdvancedFiltersOpen }),
 
   properties: [],
   setProperties: (properties) => set({ properties }),
@@ -141,14 +220,16 @@ export const useAppStore = create<AppState>((set) => ({
       }
     })),
 
-  favorites: JSON.parse(localStorage.getItem('uytop_favs') || '[]'),
+  favorites: [],
   toggleFavorite: (propertyId) =>
     set((state) => {
       const exists = state.favorites.includes(propertyId);
       const updated = exists
         ? state.favorites.filter((id) => id !== propertyId)
         : [...state.favorites, propertyId];
-      localStorage.setItem('uytop_favs', JSON.stringify(updated));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('uytop_favs', JSON.stringify(updated));
+      }
       return { favorites: updated };
     }),
 
@@ -160,7 +241,8 @@ export const useAppStore = create<AppState>((set) => ({
         return { compareList: state.compareList.filter((id) => id !== propertyId) };
       }
       if (state.compareList.length >= 4) {
-        alert("Ko'pi bilan 4 ta mulkni solishtirish mumkin");
+        // Will trigger toast via setTimeout to avoid set-inside-set
+        setTimeout(() => useAppStore.getState().showToast("Ko'pi bilan 4 ta mulkni solishtirish mumkin", 'warning'), 0);
         return state;
       }
       return { compareList: [...state.compareList, propertyId] };
@@ -185,6 +267,71 @@ export const useAppStore = create<AppState>((set) => ({
   isModerationModalOpen: false,
   setIsModerationModalOpen: (isModerationModalOpen) => set({ isModerationModalOpen }),
 
+  currency: 'UZS',
+  setCurrency: (currency) => set({ currency }),
+
+  isFavoritesModalOpen: false,
+  setIsFavoritesModalOpen: (isFavoritesModalOpen) => set({ isFavoritesModalOpen }),
+
+  isMortgageModalOpen: false,
+  setIsMortgageModalOpen: (isMortgageModalOpen) => set({ isMortgageModalOpen }),
+  mortgageInitialPrice: 600000000,
+  setMortgageInitialPrice: (mortgageInitialPrice) => set({ mortgageInitialPrice }),
+
+  isValuationModalOpen: false,
+  setIsValuationModalOpen: (isValuationModalOpen) => set({ isValuationModalOpen }),
+
+  isAlertModalOpen: false,
+  setIsAlertModalOpen: (isAlertModalOpen) => set({ isAlertModalOpen }),
+
   isMobileMapView: false,
-  setIsMobileMapView: (isMobileMapView) => set({ isMobileMapView })
+  setIsMobileMapView: (isMobileMapView) => set({ isMobileMapView }),
+
+  recentlyViewed: [],
+  addRecentlyViewed: (propertyId) => set((state) => {
+    const filtered = state.recentlyViewed.filter(id => id !== propertyId);
+    const updated = [propertyId, ...filtered].slice(0, 10);
+    if (typeof window !== 'undefined') localStorage.setItem('uytop_recent', JSON.stringify(updated));
+    return { recentlyViewed: updated };
+  }),
+  clearRecentlyViewed: () => {
+    if (typeof window !== 'undefined') localStorage.removeItem('uytop_recent');
+    set({ recentlyViewed: [] });
+  },
+  isRecentDrawerOpen: false,
+  setIsRecentDrawerOpen: (isRecentDrawerOpen) => set({ isRecentDrawerOpen }),
+
+  // AI Personal Home Finder Implementation
+  isAiHomeFinderOpen: false,
+  setIsAiHomeFinderOpen: (isAiHomeFinderOpen) => set({ isAiHomeFinderOpen }),
+  aiFinderMessages: [],
+  setAiFinderMessages: (aiFinderMessages) => set({ aiFinderMessages }),
+  addAiFinderMessage: (msg) => set((state) => ({ aiFinderMessages: [...state.aiFinderMessages, msg] })),
+  aiFinderPreferences: {},
+  setAiFinderPreferences: (prefs) => set((state) => ({ aiFinderPreferences: { ...state.aiFinderPreferences, ...prefs } })),
+  resetAiFinder: () => set({ aiFinderMessages: [], aiFinderPreferences: {}, aiFinderRecommendations: [] }),
+  aiFinderRecommendations: [],
+  setAiFinderRecommendations: (aiFinderRecommendations) => set({ aiFinderRecommendations }),
+  isSavedProfilesOpen: false,
+  setIsSavedProfilesOpen: (isSavedProfilesOpen) => set({ isSavedProfilesOpen }),
+
+  reportingPropertyId: null,
+  setReportingPropertyId: (reportingPropertyId) => set({ reportingPropertyId }),
+
+  // Legal Rental Contract Generator
+  isContractModalOpen: false,
+  setIsContractModalOpen: (isContractModalOpen) => set({ isContractModalOpen }),
+  contractProperty: null,
+  setContractProperty: (contractProperty) => set({ contractProperty }),
+
+  // Toast Notifications
+  toasts: [],
+  showToast: (message, type = 'info') => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
+    setTimeout(() => {
+      set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
+    }, 3500);
+  },
+  dismissToast: (id) => set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
 }));

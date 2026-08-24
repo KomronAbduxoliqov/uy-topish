@@ -1,8 +1,10 @@
+'use client';
+
 import React, { useState } from 'react';
-import { X, User, Phone, Lock, CheckCircle2, Shield } from 'lucide-react';
+import { X, User, Phone, Lock, Shield } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { translations } from '../../i18n';
-import { UserRole, UserVerificationStatus } from '@uytop/shared-types';
+import { apiClient } from '../../lib/api/client';
 
 export const AuthModal: React.FC = () => {
   const { isAuthModalOpen, setIsAuthModalOpen, setUser, language } = useAppStore();
@@ -12,30 +14,42 @@ export const AuthModal: React.FC = () => {
   const [phone, setPhone] = useState('+998');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<UserRole>(UserRole.USER);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isAuthModalOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
-    if (!phone || phone.length < 9) {
-      alert("Iltimos, to'liq telefon raqamingizni kiriting");
+    if (!/^\+?998\d{9}$/.test(phone.replace(/\s/g, ''))) {
+      setError("Telefon raqamini +998901234567 formatida kiriting");
       return;
     }
 
-    // Mock successful authentication for frontend instant experience
-    const mockUser = {
-      id: `usr-${Date.now()}`,
-      phone,
-      fullName: fullName || 'Rustam Karimov',
-      role,
-      verificationStatus: UserVerificationStatus.PHONE_VERIFIED,
-      createdAt: new Date().toISOString()
-    };
+    setIsSubmitting(true);
+    try {
+      const payload = mode === 'register' ? { phone, password, fullName } : { phone, password };
+      const response = await fetch(`/api/v1/auth/${mode === 'login' ? 'login' : 'register'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) {
+        setError(typeof result?.message === 'string' ? result.message : "Kirishda xatolik yuz berdi");
+        return;
+      }
 
-    setUser(mockUser, 'mock_jwt_token_' + Date.now());
-    setIsAuthModalOpen(false);
+      setUser(result.data.user, result.data.accessToken);
+      setPassword('');
+      setIsAuthModalOpen(false);
+    } catch {
+      setError("Server bilan bog'lanib bo'lmadi. Qayta urinib ko'ring.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -55,10 +69,16 @@ export const AuthModal: React.FC = () => {
             <Shield className="w-6 h-6" />
           </div>
           <h3 className="text-xl font-extrabold text-slate-900">
-            {mode === 'login' ? 'Tizimga kirish' : 'Ro\'yxatdan o\'tish'}
+            {isSubmitting
+              ? (language === 'en' ? 'Processing...' : language === 'ru' ? 'Загрузка...' : 'Kutilmoqda...')
+              : mode === 'login'
+              ? (language === 'en' ? 'Sign In' : language === 'ru' ? 'Вход в аккаунт' : 'Tizimga kirish')
+              : (language === 'en' ? 'Create Account' : language === 'ru' ? 'Регистрация' : "Ro'yxatdan o'tish")}
           </h3>
           <p className="text-xs text-slate-500 mt-1">
-            {mode === 'login' ? 'Telefon raqamingiz orqali kiring' : 'Yangi hisob oching va e\'lonlar boshqaring'}
+            {mode === 'login'
+              ? (language === 'en' ? 'Enter with your phone number' : language === 'ru' ? 'Войдите по номеру телефона' : 'Telefon raqamingiz orqali kiring')
+              : (language === 'en' ? 'Create an account to manage listings' : language === 'ru' ? 'Создайте аккаунт для управления объявлениями' : "Yangi hisob oching va e'lonlar boshqaring")}
           </p>
         </div>
 
@@ -71,7 +91,7 @@ export const AuthModal: React.FC = () => {
               mode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
             }`}
           >
-            Kirish
+            {language === 'en' ? 'Sign In' : language === 'ru' ? 'Вход' : 'Kirish'}
           </button>
           <button
             type="button"
@@ -80,7 +100,7 @@ export const AuthModal: React.FC = () => {
               mode === 'register' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
             }`}
           >
-            Ro'yxatdan o'tish
+            {language === 'en' ? 'Register' : language === 'ru' ? 'Регистрация' : "Ro'yxatdan o'tish"}
           </button>
         </div>
 
@@ -88,7 +108,9 @@ export const AuthModal: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">To'liq ismingiz</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">
+                {language === 'en' ? 'Full Name' : language === 'ru' ? 'Полное имя' : "To'liq ismingiz"}
+              </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -96,7 +118,7 @@ export const AuthModal: React.FC = () => {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Masalan: Sardor Rahimov"
+                  placeholder={language === 'en' ? 'e.g. John Doe' : language === 'ru' ? 'Например: Сардор Рахимов' : 'Masalan: Sardor Rahimov'}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
                 />
               </div>
@@ -104,7 +126,9 @@ export const AuthModal: React.FC = () => {
           )}
 
           <div>
-            <label className="text-xs font-semibold text-slate-500 block mb-1">Telefon raqam</label>
+            <label className="text-xs font-semibold text-slate-500 block mb-1">
+              {language === 'en' ? 'Phone Number' : language === 'ru' ? 'Номер телефона' : 'Telefon raqam'}
+            </label>
             <div className="relative">
               <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -119,12 +143,16 @@ export const AuthModal: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-500 block mb-1">Parol</label>
+            <label className="text-xs font-semibold text-slate-500 block mb-1">
+              {language === 'en' ? 'Password' : language === 'ru' ? 'Пароль' : 'Parol'}
+            </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
                 required
+                minLength={mode === 'register' ? 12 : undefined}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -133,26 +161,18 @@ export const AuthModal: React.FC = () => {
             </div>
           </div>
 
-          {mode === 'register' && (
-            <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Foydalanuvchi turi</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer"
-              >
-                <option value={UserRole.USER}>Oddiy izlovchi (Foydalanuvchi)</option>
-                <option value={UserRole.OWNER}>Mulk egasi (Kvartira / Uy egasi)</option>
-                <option value={UserRole.AGENT}>Ko'chmas mulk agenti (Rieltor)</option>
-              </select>
-            </div>
-          )}
+          {error && <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2">{error}</p>}
 
           <button
             type="submit"
-            className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm rounded-xl shadow-md transition-all mt-2"
+            disabled={isSubmitting}
+            className="w-full py-3 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-bold text-sm rounded-xl shadow-md transition-all mt-2"
           >
-            {mode === 'login' ? 'Tizimga kirish' : 'Ro\'yxatdan o\'tish'}
+            {isSubmitting
+              ? (language === 'en' ? 'Processing...' : language === 'ru' ? 'Загрузка...' : 'Kutilmoqda...')
+              : mode === 'login'
+              ? (language === 'en' ? 'Sign In' : language === 'ru' ? 'Войти' : 'Kirish')
+              : (language === 'en' ? 'Create Account' : language === 'ru' ? 'Зарегистрироваться' : "Ro'yxatdan o'tish")}
           </button>
         </form>
       </div>

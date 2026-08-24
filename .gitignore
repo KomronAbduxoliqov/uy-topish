@@ -33,3 +33,10 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript & Generated artifacts
+*.tsbuildinfo
+packages/*/src/*.js
+packages/*/src/*.js.map
+packages/*/src/*.d.ts
+

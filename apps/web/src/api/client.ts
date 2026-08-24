@@ -55,7 +55,7 @@ export const apiClient = {
         return { items: json.data || [], total: json.meta?.total || (json.data || []).length };
       }
     } catch {
-      // Backend not running, use client-side PostGIS simulation engine
+      // Backend not running, use client-side simulation engine
     }
 
     // Client-side fallback engine

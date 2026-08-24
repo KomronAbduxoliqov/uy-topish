@@ -1,19 +1,19 @@
-name: UyTop CI Pipeline
+name: UyTop Production CI Test & Build Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, migration/nextjs]
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, migration/nextjs]
 
 jobs:
-  validate:
-    name: Lint, Typecheck & Tests
+  test-and-validate:
+    name: Lint, Typecheck, Unit Tests & Next.js Build
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgis/postgis:16-3.4-alpine
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -49,16 +49,31 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Typecheck Workspace
+      - name: TypeScript Workspace Verification
         run: npm run typecheck
 
-      - name: Build Shared Types & Packages
+      - name: Build Shared Types Package
         run: npm run build --workspace=@uytop/shared-types
 
-      - name: Build API & Frontend
+      - name: Frontend Unit & Behavior Tests (Vitest)
+        run: npm run test:web
+
+      - name: Backend Unit & AI Tests (Jest)
+        run: npm run test:api
+
+      - name: Spatial Geo & API Integration Tests
+        run: npm run test:integration
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: uytop_test_db
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_SECRET: uytop_ci_test_jwt_secret
+
+      - name: Build Next.js Web Frontend & NestJS Core API
         run: |
           npm run build --workspace=@uytop/api
           npm run build --workspace=@uytop/web
-
-      - name: Run Unit & Integration Tests
-        run: npm run test --workspace=@uytop/api --if-present

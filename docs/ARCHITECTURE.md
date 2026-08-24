@@ -1,85 +1,105 @@
-# UyTop Technical Architecture & Operations Guide
-
-## 1. Executive Summary
-**UyTop** is a high-performance, AI-driven, map-first real estate platform built specifically for Uzbekistan.
-It replaces legacy text-only bulletin boards with spatial discovery (Yandex Maps + PostGIS) and natural-language intent processing grounded in factual database listings.
+# UyTop — Production Technical Architecture & Operations Guide
+**Next.js App Router + NestJS Modular Monolith + PostgreSQL 16 + Redis**
 
 ---
 
-## 2. System Overview & Monorepo Topology
+## 1. Executive Overview
+**UyTop** is an AI-powered, map-first real estate discovery platform built specifically for Uzbekistan.
+The platform uses **Next.js 14 App Router** for the frontend client/SSR layer, **NestJS** for the backend domain monolith, **PostgreSQL 16** with indexed geographical coordinates for fast radius and bounding queries, and **Redis 7** for caching and rate limiting.
+
+---
+
+## 2. Production Topology & Monorepo Structure
+
 ```
 uy-kvartira-topish/
 ├── apps/
-│   ├── api/                    # NestJS Core Modular Monolith API
-│   │   └── src/modules/
-│   │       ├── auth/           # JWT, +998 validation, RBAC
-│   │       ├── geo/            # PostGIS calculations, Metro stations, Districts
-│   │       ├── properties/     # Real estate CRUD, photo galleries, seeders
-│   │       ├── search/         # Spatial radius, faceted & full-text search
-│   │       ├── ai/             # Intent parser, grounded commentary generator
-│   │       ├── favorites/      # Saved listings & property compare matrix
-│   │       ├── moderation/     # Listing review queue, duplicate detection
-│   │       └── admin/          # Metrics, user management
-│   └── web/                    # React 18 + Vite + Tailwind Client
-│       └── src/
-│           ├── features/
-│           │   ├── map/        # Yandex Maps SDK 2.1, Custom price badges, Radius circle
-│           │   ├── search/     # Natural language AI search hero & Filter bar
-│           │   ├── properties/ # Listing cards, Detail view, Compare matrix
-│           │   ├── wizard/     # 10-step listing creation wizard
-│           │   ├── auth/       # Phone login & registration modal
-│           │   └── admin/      # Moderation control center
-│           └── store/          # Zustand global state manager
+│   ├── api/                                  # NestJS Modular Monolith API
+│   │   ├── src/
+│   │   │   ├── common/                       # Guards (JWT, Roles RBAC), Interceptors, Exception Filters
+│   │   │   ├── database/                     # Entities (User, Property, Image, Favorite, Moderation), Seeds
+│   │   │   ├── modules/                      # Auth, Geo, Properties, Search, AI, Favorites, Moderation, Admin
+│   │   │   ├── app.module.ts
+│   │   │   └── main.ts                       # Swagger OpenAPI v3 docs (/api/docs), Validation Pipes
+│   │   └── package.json
+│   │
+│   └── web/                                  # Next.js 14 App Router Frontend
+│       ├── src/
+│       │   ├── app/
+│       │   │   ├── [locale]/                 # Dynamic Locale Routing (/uz, /ru)
+│       │   │   │   ├── layout.tsx            # Server Layout (Metadata, Google Fonts, Yandex Maps SDK)
+│       │   │   │   ├── page.tsx              # Discovery Canvas (Map + AI Search + Filters + Property Cards)
+│       │   │   │   └── properties/[id]/
+│       │   │   │       └── page.tsx          # Dynamic SEO Property Page (OpenGraph, Schema.org JSON-LD)
+│       │   │   ├── globals.css               # Design tokens & custom Yandex Map price badge styles
+│       │   │   ├── page.tsx                  # Locale redirector (/ -> /uz)
+│       │   │   ├── robots.ts                 # Dynamic robots.txt
+│       │   │   └── sitemap.ts                # Dynamic sitemap.xml
+│       │   ├── components/                   # Navbar, UI Controls, Modals
+│       │   ├── features/                     # Map (Yandex SDK), Search, Properties, Wizard, Auth, Admin
+│       │   ├── lib/api/client.ts             # Typed Isomorphic API Client
+│       │   ├── store/useAppStore.ts          # SSR-safe Zustand Global Store
+│       │   └── i18n/index.ts                 # Uzbek & Russian Localization Dictionaries
+│       ├── next.config.mjs                   # API Proxy Rewrites to NestJS & Image Domains
+│       └── package.json
+│
 ├── packages/
-│   └── shared-types/           # Shared TypeScript enums, models, and DTOs
-└── infrastructure/
-    ├── docker/                 # Dockerfiles for API, Web, and Compose
-    └── nginx/                  # Nginx reverse proxy configuration
+│   └── shared-types/                         # Shared TypeScript Enums, DTOs & Domain Models
+│
+├── infrastructure/
+│   ├── docker/
+│   │   ├── Dockerfile.api                    # Multi-stage Alpine Container for NestJS
+│   │   ├── Dockerfile.web                    # Multi-stage Alpine Container for Next.js
+│   │   └── docker-compose.yml                # Full Stack Orchestration (PostgreSQL, Redis, API, Web, Nginx)
+│   └── nginx/
+│       └── default.conf                      # Production Reverse Proxy & SSL Gateway
+│
+├── .github/workflows/                        # GitHub Actions CI/CD Workflows
+├── .env.example
+└── package.json
 ```
 
 ---
 
-## 3. Spatial & PostGIS Implementation
-Coordinates are indexed using spatial Euclidean/Spherical Great-Circle formulas.
-For PostGIS SQL:
+## 3. High-Performance Spatial & Radius Strategy
+
+Properties store high-precision geographical coordinates (`latitude`, `longitude`) with composite B-Tree indexing.
+Radius queries use the standard Great-Circle Haversine formula and bounding boxes:
+
 ```sql
 SELECT p.*,
-       ST_Distance(
-         ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)::geography,
-         ST_SetSRID(ST_MakePoint(:centerLng, :centerLat), 4326)::geography
-       ) AS distance_meters
+       (6371000 * acos(
+         cos(radians(:centerLat)) * cos(radians(p.latitude)) *
+         cos(radians(p.longitude) - radians(:centerLng)) +
+         sin(radians(:centerLat)) * sin(radians(p.latitude))
+       )) AS distance_meters
 FROM properties p
 WHERE p.status = 'PUBLISHED'
-  AND ST_DWithin(
-    ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)::geography,
-    ST_SetSRID(ST_MakePoint(:centerLng, :centerLat), 4326)::geography,
-    :radiusMeters
-  )
+  AND p.latitude BETWEEN :minLat AND :maxLat
+  AND p.longitude BETWEEN :minLng AND :maxLng
 ORDER BY distance_meters ASC;
 ```
 
 ---
 
-## 4. AI Grounding & Anti-Hallucination Pipeline
-1. User enters natural query (*"Chilonzorda metroga yaqin 4 mln gacha 2 xonali mebelli"*).
-2. NLP Extractor extracts structured intent: `{ district: 'Chilonzor', rooms: 2, maxPrice: 4000000, furnished: true, nearMetro: true }`.
-3. Strict SQL query runs against the verified PostgreSQL database.
-4. Explanations and recommendations are generated strictly from returned database records.
+## 4. Running the Full Production Stack
 
----
-
-## 5. Running the Application
-
-### Method A: Standalone Quick Run (Frontend with mock-ready backend client)
-```bash
-npm install
-npm run build --workspace=@uytop/shared-types
-npm run dev:web
-```
-
-### Method B: Full Stack Docker Compose
+### Full Stack Docker Orchestration:
 ```bash
 docker compose -f infrastructure/docker/docker-compose.yml up -d
 ```
-API Documentation: `http://localhost:4000/api/docs`
-Web Application: `http://localhost:3000` (or `http://localhost:80` via Docker)
+* **Web Frontend**: `http://localhost:80` (or `http://localhost:3000`)
+* **API Swagger Docs**: `http://localhost:4000/api/docs`
+* **Health Check**: `http://localhost:4000/api/v1/geo/districts`
+
+### Local Development:
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Build shared types
+npm run build --workspace=@uytop/shared-types
+
+# 3. Start development servers concurrently
+npm run dev
+```
