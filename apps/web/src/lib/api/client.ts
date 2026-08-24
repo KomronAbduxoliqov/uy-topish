@@ -359,6 +359,7 @@ export const apiClient = {
     total: number;
     aiCommentaryUz: string;
     aiCommentaryRu: string;
+    aiCommentaryEn?: string;
   }> {
     const backendAi = await safeApiFetch('/ai/search', {
       method: 'POST',

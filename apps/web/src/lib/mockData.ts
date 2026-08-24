@@ -1396,7 +1396,7 @@ export const INITIAL_WEB_PROPERTIES: Property[] = [
     livingAreaSqm: 38,
     floor: 3,
     totalFloors: 5,
-    renovation: RenovationType.COSMETIC,
+    renovation: RenovationType.RENOVATED,
     furnished: false,
     buildingType: BuildingType.PANEL,
     yearBuilt: 2012,

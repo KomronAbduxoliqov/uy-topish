@@ -36,6 +36,7 @@ export enum PropertyType {
 export enum RenovationType {
   NEW = 'NEW',                   // Yangi / Evro ta'mir
   RENOVATED = 'RENOVATED',       // Yaxshi ta'mirlangan
+  COSMETIC = 'COSMETIC',         // Kosmetik ta'mir
   AVERAGE = 'AVERAGE',           // O'rtacha ta'mir
   NEEDS_REPAIR = 'NEEDS_REPAIR'  // Ta'mirtalab
 }

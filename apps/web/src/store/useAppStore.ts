@@ -118,6 +118,7 @@ interface AppState {
   aiFinderPreferences: any;
   setAiFinderPreferences: (prefs: any) => void;
   resetAiFinder: () => void;
+  resetAiFinderMessages: () => void;
   aiFinderRecommendations: any[];
   setAiFinderRecommendations: (recs: any[]) => void;
   isSavedProfilesOpen: boolean;
@@ -310,6 +311,7 @@ export const useAppStore = create<AppState>((set) => ({
   aiFinderPreferences: {},
   setAiFinderPreferences: (prefs) => set((state) => ({ aiFinderPreferences: { ...state.aiFinderPreferences, ...prefs } })),
   resetAiFinder: () => set({ aiFinderMessages: [], aiFinderPreferences: {}, aiFinderRecommendations: [] }),
+  resetAiFinderMessages: () => set({ aiFinderMessages: [] }),
   aiFinderRecommendations: [],
   setAiFinderRecommendations: (aiFinderRecommendations) => set({ aiFinderRecommendations }),
   isSavedProfilesOpen: false,

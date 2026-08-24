@@ -172,8 +172,7 @@ export const AiHomeFinderModal: React.FC = () => {
             ? `Поиск: ${aiFinderPreferences?.district || 'Ташкент'} ${aiFinderPreferences?.rooms || 2}-комн.`
             : `${aiFinderPreferences?.district || 'Toshkent'} ${aiFinderPreferences?.rooms || 2} xonali qidiruv`,
         preferences: aiFinderPreferences,
-        importanceWeights: aiFinderPreferences?.importanceWeights,
-        notificationFrequency: 'daily'
+        isActiveAlert: true
       });
       setSaveSuccess(true);
       showToast(
