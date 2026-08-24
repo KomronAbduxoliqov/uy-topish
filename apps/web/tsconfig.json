@@ -20,7 +20,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@uytop/shared-types": ["../../packages/shared-types/dist/index.d.ts", "../../packages/shared-types/src"]
+      "@uytop/shared-types": ["./src/types/shared-types.ts"]
     }
   },
   "include": [

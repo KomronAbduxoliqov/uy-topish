@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  transpilePackages: ['@uytop/shared-types'],
   images: {
     remotePatterns: [
       {
