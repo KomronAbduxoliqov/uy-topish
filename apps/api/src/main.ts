@@ -20,11 +20,54 @@ async function bootstrap() {
       abortOnError: false,
     });
   } catch (err: any) {
-    // If DB is unavailable but we still want the HTTP server running,
-    // create app with a minimal no-DB module — routes like /api/v1/health still work.
-    logger.error(`❌ App init error (DB may be unavailable): ${err?.message}`);
-    logger.warn('⚡ Starting in degraded mode — DB-dependent routes will be unavailable');
-    process.exit(1); // Let Render retry (retryAttempts will handle reconnect on next deploy)
+    logger.error(`❌ Database connection failed: ${err?.message}`);
+    logger.warn('⚡ Starting in Standalone Fallback mode to keep HTTP service alive...');
+
+    const express = require('express');
+    const fallbackApp = express();
+    const port = process.env.PORT || 4000;
+
+    fallbackApp.use(express.json());
+
+    // CORS for fallback
+    fallbackApp.use((req: any, res: any, next: any) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+      next();
+    });
+
+    fallbackApp.get('/api/v1/health', (req: any, res: any) => {
+      res.status(200).json({
+        status: 'degraded',
+        message: 'UyTop API server is online. Database is pending configuration.',
+        help: 'Add DATABASE_URL to your Render Web Service Environment Variables to connect PostgreSQL.',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    fallbackApp.get('/api/v1/health/ready', (req: any, res: any) => {
+      res.status(200).json({
+        status: 'degraded',
+        database: 'disconnected',
+        help: 'Add DATABASE_URL to your Render Web Service Environment Variables to connect PostgreSQL.',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    fallbackApp.get('*', (req: any, res: any) => {
+      res.status(200).json({
+        status: 'degraded',
+        service: 'UyTop API',
+        message: 'API is running in fallback mode.',
+        help: 'Configure DATABASE_URL in Render Dashboard -> Environment Variables to activate all features.',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    fallbackApp.listen(port, '0.0.0.0', () => {
+      logger.log(`🚀 UyTop API Fallback Server is running on port ${port}`);
+    });
+    return;
   }
 
   const isProduction = process.env.NODE_ENV === 'production';

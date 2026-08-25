@@ -37,12 +37,12 @@ import { HealthModule } from './modules/health/health.module';
         const shouldSync = config.get<string>('DB_SYNCHRONIZE') === 'true' || !isProd;
         const sslRejectUnauthorized = config.get<string>('DB_SSL_REJECT_UNAUTHORIZED') === 'true';
 
-        // Common resilience options – give Render's DB up to 75s to become available
+        // Fast resilience options – retry 3 times with 2s delay
         const resilienceOptions = {
-          retryAttempts: 15,
-          retryDelay: 5000,
+          retryAttempts: 3,
+          retryDelay: 2000,
           keepConnectionAlive: true,
-          connectTimeoutMS: 10000,
+          connectTimeoutMS: 5000,
         };
 
         const baseOptions = {
