@@ -46,7 +46,7 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, health-checks, or server-to-server)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
         callback(null, true);
       } else {
         callback(new Error('Blocked by CORS policy'));
@@ -87,7 +87,7 @@ async function bootstrap() {
   }
 
   const port = process.env.PORT || 4000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`🚀 UyTop API is running on port ${port} (Environment: ${process.env.NODE_ENV || 'development'})`);
   logger.log(`📚 Health status endpoint available at /api/v1/health & /api/v1/health/ready`);
 }

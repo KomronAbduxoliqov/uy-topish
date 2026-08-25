@@ -34,6 +34,8 @@ import { HealthModule } from './modules/health/health.module';
       useFactory: (config: ConfigService) => {
         const isProd = config.get<string>('NODE_ENV') === 'production';
         const dbUrl = config.get<string>('DATABASE_URL');
+        const shouldSync = config.get<string>('DB_SYNCHRONIZE') === 'true' || !isProd;
+        const sslRejectUnauthorized = config.get<string>('DB_SSL_REJECT_UNAUTHORIZED') === 'true';
 
         const baseOptions = {
           entities: [
@@ -46,7 +48,7 @@ import { HealthModule } from './modules/health/health.module';
             PropertyRiskAssessmentEntity,
             PropertyReportEntity,
           ],
-          synchronize: !isProd,
+          synchronize: shouldSync,
           extra: {
             max: Number(config.get<number>('DB_POOL_MAX', 25)),
             idleTimeoutMillis: 30000,
@@ -55,14 +57,16 @@ import { HealthModule } from './modules/health/health.module';
         };
 
         if (dbUrl) {
+          const isSsl = config.get<string>('DB_SSL') !== 'false';
           return {
             type: 'postgres',
             url: dbUrl,
             ...baseOptions,
-            ssl: isProd ? { rejectUnauthorized: true } : false,
+            ssl: isSsl ? { rejectUnauthorized: sslRejectUnauthorized } : false,
           };
         }
 
+        const isSslConfigured = config.get<string>('DB_SSL') === 'true';
         return {
           type: 'postgres',
           host: config.get<string>('DB_HOST', 'localhost'),
@@ -71,6 +75,7 @@ import { HealthModule } from './modules/health/health.module';
           password: config.get<string>('DB_PASSWORD'),
           database: config.get<string>('DB_NAME', 'uytop_db'),
           ...baseOptions,
+          ssl: isSslConfigured ? { rejectUnauthorized: sslRejectUnauthorized } : false,
         };
       },
     }),
