@@ -37,6 +37,14 @@ import { HealthModule } from './modules/health/health.module';
         const shouldSync = config.get<string>('DB_SYNCHRONIZE') === 'true' || !isProd;
         const sslRejectUnauthorized = config.get<string>('DB_SSL_REJECT_UNAUTHORIZED') === 'true';
 
+        // Common resilience options – give Render's DB up to 75s to become available
+        const resilienceOptions = {
+          retryAttempts: 15,
+          retryDelay: 5000,
+          keepConnectionAlive: true,
+          connectTimeoutMS: 10000,
+        };
+
         const baseOptions = {
           entities: [
             UserEntity,
@@ -50,16 +58,17 @@ import { HealthModule } from './modules/health/health.module';
           ],
           synchronize: shouldSync,
           extra: {
-            max: Number(config.get<number>('DB_POOL_MAX', 25)),
+            max: Number(config.get<number>('DB_POOL_MAX', 10)),
             idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 5000,
+            connectionTimeoutMillis: 10000,
           },
+          ...resilienceOptions,
         };
 
         if (dbUrl) {
           const isSsl = config.get<string>('DB_SSL') !== 'false';
           return {
-            type: 'postgres',
+            type: 'postgres' as const,
             url: dbUrl,
             ...baseOptions,
             ssl: isSsl ? { rejectUnauthorized: sslRejectUnauthorized } : false,
@@ -68,7 +77,7 @@ import { HealthModule } from './modules/health/health.module';
 
         const isSslConfigured = config.get<string>('DB_SSL') === 'true';
         return {
-          type: 'postgres',
+          type: 'postgres' as const,
           host: config.get<string>('DB_HOST', 'localhost'),
           port: config.get<number>('DB_PORT', 5432),
           username: config.get<string>('DB_USER', 'postgres'),

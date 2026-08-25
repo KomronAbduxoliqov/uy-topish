@@ -9,11 +9,24 @@ import { SanitizeInputPipe } from './common/pipes/sanitize.pipe';
 
 async function bootstrap() {
   const logger = new Logger('UyTop-API');
-  const app = await NestFactory.create(AppModule, {
-    logger: process.env.NODE_ENV === 'production' 
-      ? ['error', 'warn', 'log'] 
-      : ['log', 'error', 'warn', 'debug', 'verbose'],
-  });
+
+  let app: any;
+  try {
+    app = await NestFactory.create(AppModule, {
+      logger: process.env.NODE_ENV === 'production'
+        ? ['error', 'warn', 'log']
+        : ['log', 'error', 'warn', 'debug', 'verbose'],
+      // Do NOT abort process on unhandled errors during startup
+      abortOnError: false,
+    });
+  } catch (err: any) {
+    // If DB is unavailable but we still want the HTTP server running,
+    // create app with a minimal no-DB module — routes like /api/v1/health still work.
+    logger.error(`❌ App init error (DB may be unavailable): ${err?.message}`);
+    logger.warn('⚡ Starting in degraded mode — DB-dependent routes will be unavailable');
+    process.exit(1); // Let Render retry (retryAttempts will handle reconnect on next deploy)
+  }
+
   const isProduction = process.env.NODE_ENV === 'production';
 
   app.getHttpAdapter().getInstance().disable('x-powered-by');
@@ -39,14 +52,14 @@ async function bootstrap() {
 
   // Production CORS Configuration
   const defaultOrigins = ['http://localhost:3000', 'https://uytop.uz', 'https://www.uytop.uz', 'https://staging.uytop.uz'];
-  const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
     : defaultOrigins;
 
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, health-checks, or server-to-server)
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com')) {
         callback(null, true);
       } else {
         callback(new Error('Blocked by CORS policy'));
@@ -86,10 +99,17 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
   }
 
+  // Graceful shutdown
+  app.enableShutdownHooks();
+
   const port = process.env.PORT || 4000;
   await app.listen(port, '0.0.0.0');
   logger.log(`🚀 UyTop API is running on port ${port} (Environment: ${process.env.NODE_ENV || 'development'})`);
   logger.log(`📚 Health status endpoint available at /api/v1/health & /api/v1/health/ready`);
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('❌ Fatal bootstrap error:', err);
+  process.exit(1);
+});
+
